@@ -1,24 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring } from "framer-motion";
-import { Search, ExternalLink, Filter, Quote, Sun, Moon, Shuffle, Sparkles } from "lucide-react";
+import { Search, ExternalLink, Filter, Sun, Moon, Shuffle, Sparkles } from "lucide-react";
 
-/**
- * ActuallyGoodRegulations.eu
- * Modern, bold, mobile-first single-file site.
- * - Functional minimalism with big typography and generous whitespace
- * - Warm earthy base + punchy neon accent for retro-futurist vibes
- * - Micro-animations, hover effects, animated cursor (reduced motion aware)
- * - Accessible by design (landmarks, labels, proper contrast, skip link)
- *
- * Tech:
- * - Tailwind CSS (assumed available in environment)
- * - Framer Motion for subtle animations
- * - No external images/fonts (sustainable performance)
- */
-
-// ---------------------------
-// Data
-// ---------------------------
+import { NewsBox } from "./NewsBox"
 
 type RegItem = {
   id: string
@@ -29,8 +13,8 @@ type RegItem = {
   category: "Money" | "Travel" | "Digital" | "Safety" | "Food" | "Environment" | "Health" | "Shopping" | "Rights"
 }
 
-// Add example descriptions (here only one example shown, but you’d add for each regulation)
-const REGULATIONS: RegItem[] = [
+// Data
+const regulationsData: RegItem[] = [
   {
     id: "consumer-rights-2011-83",
     title: "Consumer Rights Directive 2011/83/EU",
@@ -313,7 +297,7 @@ const REGULATIONS: RegItem[] = [
   },
 ]
 
-const CATEGORIES = [
+const categories = [
   "All",
   "Money",
   "Travel",
@@ -342,18 +326,45 @@ function usePrefersReducedMotion() {
   return reduced
 }
 
+// Tiny deterministic PRNG for shuffle
+function mulberry32(a: number) {
+  return function () {
+    let t = (a += 0x6d2b79f5)
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
 // ---------------------------
 // Main Component
 // ---------------------------
 
 export default function App() {
   const [query, setQuery] = useState("")
-  const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("All")
-  const [dark, setDark] = useState(true)
+  const [category, setCategory] = useState<(typeof categories)[number]>("All")
+  const [dark, setDark] = useState(false) // Start with false to avoid hydration mismatch
+  const [mounted, setMounted] = useState(false)
+  
+  // Initialize dark mode after mount to avoid hydration issues
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme")
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
+    const shouldBeDark = savedTheme === "dark" || (!savedTheme && prefersDark)
+    setDark(shouldBeDark)
+    setMounted(true)
+  }, [])
+  
+  useEffect(() => {
+    if (mounted) {
+      document.documentElement.classList.toggle("dark", dark)
+      localStorage.setItem("theme", dark ? "dark" : "light")
+    }
+  }, [dark, mounted])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return REGULATIONS.filter((r) =>
+    return regulationsData.filter((r) =>
       (category === "All" || r.category === category) &&
       (q === "" || r.tagline.toLowerCase().includes(q) || r.title.toLowerCase().includes(q) || r.explainer.toLowerCase().includes(q))
     )
@@ -376,7 +387,7 @@ export default function App() {
   }, [mx, my, reduced])
 
   // Shuffle for “Surprise me”
-  const [seed, setSeed] = useState(0)
+  const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9))
   const shuffled = useMemo(() => {
     const arr = [...filtered]
     const rng = mulberry32(seed)
@@ -387,12 +398,8 @@ export default function App() {
     return arr
   }, [filtered, seed])
 
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark)
-  }, [dark])
-
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900 selection:bg-amber-200 selection:text-stone-900 dark:bg-zinc-950 dark:text-zinc-50">
+    <div className="min-h-screen bg-stone-50 text-stone-900 selection:bg-amber-200 selection:text-stone-900 dark:bg-zinc-900 dark:text-zinc-50">
       <a
         href="#content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:bg-amber-400 focus:text-stone-900 focus:px-3 focus:py-2 focus:rounded-lg"
@@ -418,6 +425,8 @@ export default function App() {
       )}
 
       <header className="px-4 sm:px-6 lg:px-10 py-6">
+        <NewsBox />
+        
         <nav className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9" aria-hidden>
@@ -432,13 +441,13 @@ export default function App() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            {/* <button
               onClick={() => setDark((d) => !d)}
               className="inline-flex items-center gap-2 rounded-xl border border-stone-300/60 bg-white/70 px-3 py-2 text-sm shadow-sm backdrop-blur hover:shadow transition dark:border-zinc-700 dark:bg-zinc-900/70"
               aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
             >
               {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}<span className="hidden sm:inline">Theme</span>
-            </button>
+            </button> */}
             <button
               onClick={() => setSeed((s) => (s + 1) >>> 0)}
               className="inline-flex items-center gap-2 rounded-xl border border-stone-300/60 bg-white/70 px-3 py-2 text-sm shadow-sm backdrop-blur hover:shadow transition dark:border-zinc-700 dark:bg-zinc-900/70"
@@ -476,8 +485,8 @@ export default function App() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by keyword (e.g. ‘refund’, ‘privacy’, ‘bees’)"
-                className="w-full rounded-2xl border border-stone-300/70 bg-white/80 px-11 py-3 text-base shadow-sm outline-none ring-0 placeholder:text-stone-400 focus:border-amber-400 focus:bg-white focus:shadow-md dark:border-zinc-700 dark:bg-zinc-900/80 dark:focus:border-amber-400"
+                placeholder="Search by keyword (e.g. 'bees', 'privacy', 'refund')"
+                className="w-full rounded-2xl border border-stone-300/70 bg-white/80 px-11 py-3 text-base shadow-sm outline-none ring-0 placeholder:text-stone-400 focus:border-amber-400 focus:bg-white focus:shadow-md dark:border-zinc-700 dark:text-zinc-900 dark:bg-zinc-900/80 dark:focus:border-amber-400"
                 type="search"
                 aria-label="Search regulations"
               />
@@ -485,7 +494,7 @@ export default function App() {
 
             {/* Category pills */}
             <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Filter by category">
-              {CATEGORIES.map((c) => (
+              {categories.map((c) => (
                 <button
                   key={c}
                   role="tab"
@@ -495,7 +504,7 @@ export default function App() {
                     "rounded-full px-4 py-2 text-sm font-medium border transition",
                     category === c
                       ? "bg-amber-400 text-stone-900 border-amber-400 shadow"
-                      : "bg-white/70 text-stone-700 border-stone-300/70 hover:bg-white shadow-sm dark:bg-zinc-900/70 dark:text-zinc-300 dark:border-zinc-700",
+                      : "bg-white/70 text-stone-700 border-stone-300/70 hover:bg-white shadow-sm dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:text-zinc-900/70 dark:border-zinc-700",
                   ].join(" ")}
                 >
                   {c}
@@ -504,7 +513,7 @@ export default function App() {
             </div>
           </div>
           <div className="mt-2 text-sm text-stone-600 dark:text-zinc-400" aria-live="polite">
-            Showing <strong>{shuffled.length}</strong> of {REGULATIONS.length}
+            Showing <strong>{shuffled.length}</strong> of {regulationsData.length}
           </div>
         </section>
 
@@ -537,7 +546,7 @@ export default function App() {
           <div className="text-sm text-stone-600 dark:text-zinc-400 flex items-center gap-2">
             <Sparkles className="h-4 w-4" aria-hidden />
             <span>
-              Want to add more? Open a PR or send ideas.
+              Want to add more? <a href="https://github.com/jiri-vyc/actuallygoodregulations" className="text-blue-900 dark:text-yellow-400">Open a PR</a> or send ideas.
             </span>
           </div>
         </div>
@@ -559,55 +568,58 @@ function QuoteCard({ item }: { item: RegItem }) {
         }}
       />
 
-      {/* Card */}
-      <div className="relative h-full rounded-3xl border border-stone-300/70 bg-white/90 p-6 shadow-sm backdrop-blur transition group-hover:shadow-lg dark:border-zinc-700 dark:bg-zinc-900/80 focus-within:shadow-lg">
-        {/* Category pill */}
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide text-stone-700 border-stone-300/70 bg-white/70 dark:text-zinc-300 dark:border-zinc-700 dark:bg-zinc-900/70">
-          <Filter className="h-3.5 w-3.5" aria-hidden />
-          {item.category}
-        </div>
-
-        {/* Tagline */}
-        <blockquote className="text-2xl leading-snug font-extrabold tracking-tight">
-          <span className="align-top text-amber-500">“</span>
-          {item.tagline}
-          <span className="align-top text-amber-500">”</span>
-        </blockquote>
-
-        {/* Footer with link */}
-        <div className="mt-5 flex items-start justify-between gap-4">
-          <div>
-            <h3 className="text-base font-semibold">{item.title}</h3>
-            <p className="text-sm text-stone-600 dark:text-zinc-400">
-              Official text on EUR-Lex
-            </p>
+        {/* Card */}
+        <div className="relative h-full hover:z-50 rounded-3xl border border-stone-300/70 bg-white/90 p-6 shadow-sm backdrop-blur transition group-hover:shadow-lg dark:border-zinc-700 dark:bg-zinc-900/80 focus-within:shadow-lg flex flex-col">
+          {/* Category pill */}
+          <div className="mb-3 inline-flex self-start items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide text-stone-700 border-stone-300/70 bg-white/70 dark:text-zinc-300 dark:border-zinc-700 dark:bg-zinc-900/70">
+            <Filter className="h-3.5 w-3.5" aria-hidden />
+            {item.category}
           </div>
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl border border-stone-300/70 bg-white/80 px-3 py-2 text-sm font-medium text-stone-900 shadow-sm transition hover:scale-[1.02] hover:border-amber-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
-            aria-label={`Open ${item.title} on EUR-Lex in a new tab`}
-          >
-            <ExternalLink className="h-4 w-4" />
-            Open law
-          </a>
-        </div>
 
-        {/* Explainer bubble (shows on hover/focus) */}
+          {/* Tagline */}
+          <blockquote className="text-2xl leading-snug font-extrabold tracking-tight">
+            <span className="align-top text-amber-500">“</span>
+            {item.tagline}
+            <span className="align-top text-amber-500">”</span>
+          </blockquote>
+
+          {/* Footer with link */}
+          <div className="mt-auto pt-6 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold">{item.title}</h3>
+              <p className="text-sm text-stone-600 dark:text-zinc-400">
+                Official text on EUR-Lex
+              </p>
+            </div>
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-stone-300/70 bg-white/80 px-3 py-2 text-xs sm:text-sm font-medium text-stone-900 shadow-sm whitespace-nowrap transition hover:scale-[1.02] hover:border-amber-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-50"
+              aria-label={`Open ${item.title} on EUR-Lex in a new tab`}
+            >
+              <ExternalLink className="h-4 w-4" />
+              Open law
+            </a>
+          </div>
+
+
+        {/* Explainer bubble */}
         <div
           role="note"
           className="
             pointer-events-none
-            absolute left-6 right-24 -bottom-4 translate-y-full
-            max-w-md
-            rounded-2xl border border-amber-400/70 bg-white px-5 py-4
+            z-50
+            absolute left-1/2 -top-1
+            -translate-x-1/3 -translate-y-1/2
+            w-[80%] max-w-sm
+            rounded-2xl border border-amber-400/70 bg-white px-4 py-3
             text-sm font-medium leading-snug text-stone-900 shadow-xl
-            opacity-0 scale-95 translate-y-2
+            opacity-0 scale-95
             transition
-            group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0
-            group-focus-within:opacity-100 group-focus-within:scale-100 group-focus-within:translate-y-0
-            dark:border-emerald-400/50 dark:bg-zinc-900 dark:text-zinc-50
+            group-hover:opacity-100 group-hover:scale-100
+            group-focus-within:opacity-100 group-focus-within:scale-100
+            dark:border-amber-400/50 dark:bg-zinc-800 dark:text-zinc-50
           "
         >
           <p>{item.explainer}</p>
@@ -616,15 +628,4 @@ function QuoteCard({ item }: { item: RegItem }) {
       </div>
     </article>
   );
-}
-
-
-// Tiny deterministic PRNG for shuffle
-function mulberry32(a: number) {
-  return function () {
-    let t = (a += 0x6d2b79f5)
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
 }
